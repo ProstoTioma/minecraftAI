@@ -21,49 +21,70 @@ class BlockModel(nn.Module):
         return x
 
 
-# Define the input size, hidden size, and output size of the model
-input_size = 4  # x, y, z coordinates, and block type
-hidden_size = 64
-output_size = 4  # Number of keys to move (e.g., up, down, left, right)
+class Train:
+    def __init__(self, inputs):
+        input_size = 7  # x, y, z coordinates, and block type, and player coordinates
+        hidden_size = 64
+        output_size = 4  # Number of keys to move (e.g., up, down, left, right)
+        self.num_epochs = 10
 
-# Instantiate the model
-model = BlockModel(input_size, hidden_size, output_size)
+        self.model = BlockModel(input_size, hidden_size, output_size)
 
-# Move model to GPU if available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model.to(device)
+        # Move model to GPU if available
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(self.device)
 
-# Define loss function and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+        # Define loss function and optimizer
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
 
-# Example input: nearest blocks represented as a numpy array
-nearest_blocks = np.array([[1, 2, 3, 0], [4, 5, 6, 1], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0], [7, 8, 9, 0]])
+        self.train_model(inputs)
 
-# Convert input to PyTorch tensor and move to GPU
-inputs = torch.tensor(nearest_blocks, dtype=torch.float32).to(device)
+    def train_model(self, inputs):
+        inputs = torch.tensor(inputs, dtype=torch.float32).to(self.device)
+        # Assuming you have labels for training, otherwise, you need to provide them
+        labels = torch.tensor([0] * len(inputs)).to(self.device)  # Update this with actual labels
 
-# Forward pass
-outputs = model(inputs)
+        for epoch in range(self.num_epochs):  # You need to define num_epochs
+            # Forward pass
+            outputs = self.model(inputs)
 
-# Apply softmax to convert outputs to probabilities
-probabilities = torch.softmax(outputs, dim=1)
+            # Calculate loss
+            loss = self.criterion(outputs, labels)
 
-# Output will be probabilities for each key
-# You can use argmax to get the index of the highest probability
-predicted_key = torch.argmax(probabilities, dim=1)
+            # Backward pass and optimization
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
 
-print("Predicted key probabilities:", probabilities.tolist())
-movement_mapping = {
-    0: "w",
-    1: "a",
-    2: "s",
-    3: "d"
-}
+            if epoch % 100 == 0:
+                print(f"Epoch [{epoch}/{self.num_epochs}], Loss: {loss.item()}")
 
-# Convert predicted keys to WASD movements
-predicted_movements = [movement_mapping[key] for key in predicted_key.tolist()]
+        # After training, you can proceed with inference
+        self.inference(inputs)
 
-print("Predicted movements:", predicted_movements)
-time.sleep(10)
-game = formatting.Game(predicted_movements)
+    def inference(self, inputs):
+        with torch.no_grad():
+            outputs = self.model(inputs)
+
+            # Apply softmax to convert outputs to probabilities
+            probabilities = torch.softmax(outputs, dim=1)
+
+            # Output will be probabilities for each key
+            # You can use argmax to get the index of the highest probability
+            predicted_key = torch.argmax(probabilities, dim=1)
+
+            movement_mapping = {
+                0: "w",
+                1: "a",
+                2: "s",
+                3: "d"
+            }
+
+            print("Predicted key probabilities:", probabilities.tolist())
+
+            # Convert predicted keys to WASD movements
+            predicted_movements = [movement_mapping[key] for key in predicted_key.tolist()]
+
+            print("Predicted movements:", predicted_movements)
+            game = formatting.Game(predicted_movements)
